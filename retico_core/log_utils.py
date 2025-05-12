@@ -148,7 +148,7 @@ class TerminalLogger:
         self.logger = BoundLoggerTerminalWrapper(filters=filters, **kwargs)
 
     def bind(self, **kwargs):
-        self.logger = self.logger.bind(**kwargs)
+        return self.logger.bind(**kwargs)
 
     def _wrap(self, level_name, event, *args, **kwargs):
         if self.verbosity_level == 0:
@@ -222,7 +222,7 @@ class FileLogger:
         self.logger = BoundLoggerFileWrapper(filters=filters, **kwargs)
 
     def bind(self, **kwargs):
-        self.logger = self.logger.bind(**kwargs)
+        return self.logger.bind(**kwargs)
 
     def _wrap(self, level_name, event, *args, **kwargs):
         if self.verbosity_level == 0:
