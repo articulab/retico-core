@@ -508,8 +508,8 @@ class AbstractModule:
 
         # set up logger
         self.verbosity_level = verbosity_level
-        self.terminal_logger = TerminalLogger(verbosity_level=verbosity_level)
-        self.file_logger = FileLogger(verbosity_level=verbosity_level)
+        self.terminal_logger = TerminalLogger()
+        self.file_logger = FileLogger()
         self.terminal_logger = self.terminal_logger.bind(module=self.name())
         self.file_logger = self.file_logger.bind(module=self.name())
         self.file_logger.info("init")

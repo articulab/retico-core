@@ -29,292 +29,6 @@ import numpy as np
 import structlog
 
 
-#####################
-# Loggers & Functions
-#####################
-
-
-class BoundLoggerTerminalWrapper(structlog.BoundLogger):
-    """Dectorator / Singleton class of structlog.BoundLogger, that is used to configure / initialize
-    once the terminal logger for the whole system."""
-
-    def __new__(cls, filters=None):
-        if not hasattr(cls, "instance"):
-            # Define filters for the terminal logs
-            if filters is not None:
-                log_filters = filters
-            else:
-                log_filters = LOG_FILTERS
-
-            def format_module(obj):
-                splitted = str(obj).split(" ")
-                if splitted[-1] == "Module":
-                    splitted.pop(-1)
-                return " ".join(splitted)
-
-            def format_timestamp(obj):
-                return str(obj[:-4])
-
-            def format_on_type(obj):
-                if isinstance(obj, bool):
-                    return " ( " + str(obj) + " ) "
-                if isinstance(obj, int):
-                    return " | " + str(obj) + " | "
-                return " " + str(obj)
-
-            cr = structlog.dev.ConsoleRenderer(
-                colors=True,
-                columns=[
-                    structlog.dev.Column(
-                        "timestamp",
-                        structlog.dev.KeyValueColumnFormatter(
-                            key_style=None,
-                            value_style=colorama.Style.BRIGHT + colorama.Fore.BLACK,
-                            reset_style=colorama.Style.RESET_ALL,
-                            value_repr=format_timestamp,
-                        ),
-                    ),
-                    structlog.dev.Column(
-                        "level",
-                        structlog.dev.LogLevelColumnFormatter(
-                            level_styles={
-                                key: colorama.Style.BRIGHT + level
-                                for key, level in structlog.dev.ConsoleRenderer.get_default_level_styles().items()
-                            },
-                            reset_style=colorama.Style.BRIGHT + colorama.Style.RESET_ALL,
-                            width=None,
-                        ),
-                    ),
-                    structlog.dev.Column(
-                        "module",
-                        structlog.dev.KeyValueColumnFormatter(
-                            key_style=None,
-                            value_style=colorama.Fore.YELLOW,
-                            reset_style=colorama.Style.RESET_ALL,
-                            value_repr=format_module,
-                            width=10,
-                        ),
-                    ),
-                    structlog.dev.Column(
-                        "event",
-                        structlog.dev.KeyValueColumnFormatter(
-                            key_style=None,
-                            value_style=colorama.Style.BRIGHT + colorama.Fore.WHITE,
-                            reset_style=colorama.Style.RESET_ALL,
-                            value_repr=str,
-                            width=40,
-                        ),
-                    ),
-                    structlog.dev.Column(
-                        "",
-                        structlog.dev.KeyValueColumnFormatter(
-                            key_style=colorama.Fore.MAGENTA,
-                            value_style=colorama.Style.BRIGHT + colorama.Fore.CYAN,
-                            reset_style=colorama.Style.RESET_ALL,
-                            value_repr=format_on_type,
-                        ),
-                    ),
-                ],
-            )
-
-            # configure structlog to have a terminal logger
-            processors = (
-                [
-                    structlog.processors.TimeStamper(fmt="%H:%M:%S.%f"),
-                    structlog.processors.add_log_level,
-                ]
-                + log_filters
-                + [cr]
-            )
-            structlog.configure(
-                processors=processors,
-                wrapper_class=structlog.stdlib.BoundLogger,
-                cache_logger_on_first_use=True,
-            )
-            terminal_logger = structlog.get_logger("terminal")
-
-            # log info to cache the logger, using the config's cache_logger_on_first_use parameter
-            terminal_logger.info("init terminal logger")
-
-            # set the singleton instance
-            cls.instance = terminal_logger
-        return cls.instance
-
-
-class TerminalLogger:
-
-    def __init__(self, verbosity_level=0, filters=None, **kwargs):
-        self.verbosity_level = verbosity_level
-        self.logger = BoundLoggerTerminalWrapper(filters=filters, **kwargs)
-
-    def bind(self, **kwargs):
-        return self.logger.bind(**kwargs)
-
-    def _wrap(self, level_name, event, *args, **kwargs):
-        if self.verbosity_level == 0:
-            return None
-        elif self.verbosity_level == 1 and level_name == "debug":
-            super_method = getattr(self.logger, level_name)
-            return super_method(event, *args, **kwargs)
-        else:
-            super_method = getattr(self.logger, level_name)
-            return super_method(event, *args, **kwargs)
-
-    def info(self, event=None, *args, **kwargs):
-        return self._wrap("info", event, *args, **kwargs)
-
-    def debug(self, event=None, *args, **kwargs):
-        return self._wrap("debug", event, *args, **kwargs)
-
-    def warning(self, event=None, *args, **kwargs):
-        return self._wrap("warning", event, *args, **kwargs)
-
-    def error(self, event=None, *args, **kwargs):
-        return self._wrap("error", event, *args, **kwargs)
-
-    def critical(self, event=None, *args, **kwargs):
-        return self._wrap("critical", event, *args, **kwargs)
-
-    def exception(self, event=None, *args, **kwargs):
-        return self._wrap("exception", event, *args, **kwargs)
-
-
-class BoundLoggerFileWrapper(structlog.BoundLogger):
-    """Dectorator / Singleton class of structlog.BoundLogger, that is used to configure / initialize
-    once the file logger for the whole system."""
-
-    def __new__(cls, log_path="logs/run", filters=None, verbosity_level=0):
-        if not hasattr(cls, "instance"):
-            # Define filters for the terminal logs
-            if filters is not None:
-                log_filters = filters
-            else:
-                log_filters = LOG_FILTERS
-            # configure structlog to have a file logger
-            structlog.configure(
-                processors=[
-                    structlog.processors.add_log_level,
-                    structlog.processors.TimeStamper(fmt="iso"),
-                ]
-                + log_filters
-                + [
-                    structlog.processors.ExceptionRenderer(),
-                    structlog.processors.JSONRenderer(),
-                ],
-                logger_factory=structlog.WriteLoggerFactory(file=Path(log_path).open("wt", encoding="utf-8")),
-                cache_logger_on_first_use=True,
-            )
-            file_logger = structlog.get_logger("file_logger")
-
-            # log info to cache the logger, using the config's cache_logger_on_first_use parameter
-            file_logger.info("init file logger")
-
-            # set the singleton instance
-            cls.instance = file_logger
-            cls.instance.verbosity_level = verbosity_level
-        return cls.instance
-
-
-class FileLogger:
-
-    def __init__(self, verbosity_level=0, filters=None, **kwargs):
-        self.verbosity_level = verbosity_level
-        self.logger = BoundLoggerFileWrapper(filters=filters, **kwargs)
-
-    def bind(self, **kwargs):
-        return self.logger.bind(**kwargs)
-
-    def _wrap(self, level_name, event, *args, **kwargs):
-        if self.verbosity_level == 0:
-            return None
-        elif self.verbosity_level == 1 and level_name == "debug":
-            super_method = getattr(self.logger, level_name)
-            return super_method(event, *args, **kwargs)
-        else:
-            super_method = getattr(self.logger, level_name)
-            return super_method(event, *args, **kwargs)
-
-    def info(self, event=None, *args, **kwargs):
-        return self._wrap("info", event, *args, **kwargs)
-
-    def debug(self, event=None, *args, **kwargs):
-        return self._wrap("debug", event, *args, **kwargs)
-
-    def warning(self, event=None, *args, **kwargs):
-        return self._wrap("warning", event, *args, **kwargs)
-
-    def error(self, event=None, *args, **kwargs):
-        return self._wrap("error", event, *args, **kwargs)
-
-    def critical(self, event=None, *args, **kwargs):
-        return self._wrap("critical", event, *args, **kwargs)
-
-    def exception(self, event=None, *args, **kwargs):
-        return self._wrap("exception", event, *args, **kwargs)
-
-
-def create_new_log_folder(log_folder):
-    """Function that creates a new folder to store the current run's log file. Find the last run's
-    number and creates a new log folder with an increment of 1.
-
-    Args:
-        log_folder (str): the log_folder path where every run's log folder is stored.
-
-    Returns:
-        str: returns the final path of the run's log_file, with a format : logs/run_33/logs.log
-    """
-    cpt = 0
-    log_folder_full_path = log_folder + "_" + str(cpt)
-    while os.path.isdir(log_folder_full_path):
-        cpt += 1
-        log_folder_full_path = log_folder + "_" + str(cpt)
-    os.makedirs(log_folder_full_path)
-    filepath = log_folder_full_path + "/logs.log"
-    return filepath
-
-
-def configurate_logger(log_path="logs/run", filters=None, filters_terminal=None, filters_file=None, verbosity_level=0):
-    """
-    Configure structlog's logger and set general logging args (timestamps,
-    log level, etc.)
-
-    Args:
-        log_path: (str): logs folder's path.
-        filters: (list): list of function that filters logs that will be outputted in the terminal.
-    """
-    log_path = create_new_log_folder(log_path)
-    terminal_logger = TerminalLogger(
-        verbosity_level=verbosity_level, filters=filters if filters is not None else filters_terminal
-    )
-    file_logger = FileLogger(
-        log_path=log_path, verbosity_level=verbosity_level, filters=filters if filters is not None else filters_file
-    )
-    return terminal_logger, file_logger
-
-
-def log_exception(module, exception):
-    """function that enable modules to log the encountered exceptions to both logger (terminal and
-    file) in
-    a unified way (and factorize code).
-
-    Args:
-        module (object): the module that encountered the exception.
-        exception (Exception): the encountered exception.
-    """
-    module.terminal_logger.exception("The module encountered the following exception while running :")
-    module.file_logger.exception(
-        "The module encountered the following exception while running :",
-    )
-    # could introduce errors while parsing the json logs,
-    # because of the " chars in the exception tracebacks
-    # module.file_logger.exception(
-    #     "The module encountered the following exception while running :",
-    #     tarcebacks=[
-    #         tb.replace('"', "'") for tb in traceback.format_tb(exception.__traceback__)
-    #     ],
-    # )
-
-
 #############
 # Log Filters
 #############
@@ -488,9 +202,296 @@ def filter_all_but_warnings_and_errors(_, __, event_dict):
     return filter_cases(_, _, event_dict, cases=cases)
 
 
-LOG_FILTERS = []
-# LOG_FILTERS = [filter_all_from_modules]
-# LOG_FILTERS = [filter_all_but_warnings_and_errors]
+def filter_all(_, __, event_dict):
+    """function that filters all log message that has a `module` key.
+    (every retico module binds this parameter, so it would delete every log from retico modules)
+
+    Args:
+        event_dict (dict): the log message's dict, containing all parameters passed during logging.
+
+    Returns:
+        dict : returns the log_message's event_dict if it went through the filter.
+    """
+    raise structlog.DropEvent
+
+
+#####################
+# Loggers & Functions
+#####################
+
+
+class TerminalLogger(structlog.BoundLogger):
+    """Dectorator / Singleton class of structlog.BoundLogger, that is used to configure / initialize
+    once the terminal logger for the whole system."""
+
+    def __new__(cls, filters=[]):
+        if not hasattr(cls, "instance"):
+
+            def format_module(obj):
+                splitted = str(obj).split(" ")
+                if splitted[-1] == "Module":
+                    splitted.pop(-1)
+                return " ".join(splitted)
+
+            def format_timestamp(obj):
+                return str(obj[:-4])
+
+            def format_on_type(obj):
+                if isinstance(obj, bool):
+                    return " ( " + str(obj) + " ) "
+                if isinstance(obj, int):
+                    return " | " + str(obj) + " | "
+                return " " + str(obj)
+
+            cr = structlog.dev.ConsoleRenderer(
+                colors=True,
+                columns=[
+                    structlog.dev.Column(
+                        "timestamp",
+                        structlog.dev.KeyValueColumnFormatter(
+                            key_style=None,
+                            value_style=colorama.Style.BRIGHT + colorama.Fore.BLACK,
+                            reset_style=colorama.Style.RESET_ALL,
+                            value_repr=format_timestamp,
+                        ),
+                    ),
+                    structlog.dev.Column(
+                        "level",
+                        structlog.dev.LogLevelColumnFormatter(
+                            level_styles={
+                                key: colorama.Style.BRIGHT + level
+                                for key, level in structlog.dev.ConsoleRenderer.get_default_level_styles().items()
+                            },
+                            reset_style=colorama.Style.BRIGHT + colorama.Style.RESET_ALL,
+                            width=None,
+                        ),
+                    ),
+                    structlog.dev.Column(
+                        "module",
+                        structlog.dev.KeyValueColumnFormatter(
+                            key_style=None,
+                            value_style=colorama.Fore.YELLOW,
+                            reset_style=colorama.Style.RESET_ALL,
+                            value_repr=format_module,
+                            width=10,
+                        ),
+                    ),
+                    structlog.dev.Column(
+                        "event",
+                        structlog.dev.KeyValueColumnFormatter(
+                            key_style=None,
+                            value_style=colorama.Style.BRIGHT + colorama.Fore.WHITE,
+                            reset_style=colorama.Style.RESET_ALL,
+                            value_repr=str,
+                            width=40,
+                        ),
+                    ),
+                    structlog.dev.Column(
+                        "",
+                        structlog.dev.KeyValueColumnFormatter(
+                            key_style=colorama.Fore.MAGENTA,
+                            value_style=colorama.Style.BRIGHT + colorama.Fore.CYAN,
+                            reset_style=colorama.Style.RESET_ALL,
+                            value_repr=format_on_type,
+                        ),
+                    ),
+                ],
+            )
+
+            # configure structlog to have a terminal logger
+            processors = (
+                [
+                    structlog.processors.TimeStamper(fmt="%H:%M:%S.%f"),
+                    structlog.processors.add_log_level,
+                ]
+                + filters
+                + [cr]
+            )
+            structlog.configure(
+                processors=processors,
+                wrapper_class=structlog.stdlib.BoundLogger,
+                cache_logger_on_first_use=True,
+            )
+            terminal_logger = structlog.get_logger("terminal")
+
+            # log info to cache the logger, using the config's cache_logger_on_first_use parameter
+            terminal_logger.info("init terminal logger")
+
+            # set the singleton instance
+            cls.instance = terminal_logger
+        return cls.instance
+
+
+class TerminalLogger2:
+
+    def __init__(self, verbosity_level=0, filters=None, **kwargs):
+        self.verbosity_level = verbosity_level
+        self.logger = TerminalLogger(filters=filters, **kwargs)
+        print("verbosity level", self.verbosity_level)
+
+    def bind(self, **kwargs):
+        self.logger = self.logger.bind(**kwargs)
+        return self
+
+    def _wrap(self, level_name, event, *args, **kwargs):
+        print("wrapping", self.verbosity_level, level_name)
+        if self.verbosity_level == 0:
+            return None
+        elif self.verbosity_level == 1 and level_name == "debug":
+            super_method = getattr(self.logger, level_name)
+            return super_method(event, *args, **kwargs)
+        else:
+            super_method = getattr(self.logger, level_name)
+            return super_method(event, *args, **kwargs)
+
+    def info(self, event=None, *args, **kwargs):
+        print("info", event, *args, **kwargs)
+        return self._wrap("info", event, *args, **kwargs)
+
+    def debug(self, event=None, *args, **kwargs):
+        return self._wrap("debug", event, *args, **kwargs)
+
+    def warning(self, event=None, *args, **kwargs):
+        return self._wrap("warning", event, *args, **kwargs)
+
+    def error(self, event=None, *args, **kwargs):
+        return self._wrap("error", event, *args, **kwargs)
+
+    def critical(self, event=None, *args, **kwargs):
+        return self._wrap("critical", event, *args, **kwargs)
+
+    def exception(self, event=None, *args, **kwargs):
+        return self._wrap("exception", event, *args, **kwargs)
+
+
+class FileLogger(structlog.BoundLogger):
+    """Dectorator / Singleton class of structlog.BoundLogger, that is used to configure / initialize
+    once the file logger for the whole system."""
+
+    def __new__(cls, filters=[], log_path="logs/run"):
+        if not hasattr(cls, "instance"):
+            structlog.configure(
+                processors=[
+                    structlog.processors.add_log_level,
+                    structlog.processors.TimeStamper(fmt="iso"),
+                ]
+                + filters
+                + [
+                    structlog.processors.ExceptionRenderer(),
+                    structlog.processors.JSONRenderer(),
+                ],
+                logger_factory=structlog.WriteLoggerFactory(file=Path(log_path).open("wt", encoding="utf-8")),
+                cache_logger_on_first_use=True,
+            )
+            file_logger = structlog.get_logger("file_logger")
+
+            # log info to cache the logger, using the config's cache_logger_on_first_use parameter
+            file_logger.info("init file logger")
+
+            # set the singleton instance
+            cls.instance = file_logger
+        return cls.instance
+
+
+class FileLogger2:
+
+    def __init__(self, verbosity_level=0, filters=None, **kwargs):
+        self.verbosity_level = verbosity_level
+        self.logger = FileLogger(filters=filters, **kwargs)
+        self.logger.set_verbosity
+
+    def bind(self, **kwargs):
+        self.logger = self.logger.bind(**kwargs)
+        return self
+
+    def _wrap(self, level_name, event, *args, **kwargs):
+        if self.verbosity_level == 0:
+            return None
+        elif self.verbosity_level == 1 and level_name == "debug":
+            super_method = getattr(self.logger, level_name)
+            return super_method(event, *args, **kwargs)
+        else:
+            super_method = getattr(self.logger, level_name)
+            return super_method(event, *args, **kwargs)
+
+    def info(self, event=None, *args, **kwargs):
+        return self._wrap("info", event, *args, **kwargs)
+
+    def debug(self, event=None, *args, **kwargs):
+        return self._wrap("debug", event, *args, **kwargs)
+
+    def warning(self, event=None, *args, **kwargs):
+        return self._wrap("warning", event, *args, **kwargs)
+
+    def error(self, event=None, *args, **kwargs):
+        return self._wrap("error", event, *args, **kwargs)
+
+    def critical(self, event=None, *args, **kwargs):
+        return self._wrap("critical", event, *args, **kwargs)
+
+    def exception(self, event=None, *args, **kwargs):
+        return self._wrap("exception", event, *args, **kwargs)
+
+
+def create_new_log_folder(log_folder):
+    """Function that creates a new folder to store the current run's log file. Find the last run's
+    number and creates a new log folder with an increment of 1.
+
+    Args:
+        log_folder (str): the log_folder path where every run's log folder is stored.
+
+    Returns:
+        str: returns the final path of the run's log_file, with a format : logs/run_33/logs.log
+    """
+    cpt = 0
+    log_folder_full_path = log_folder + "_" + str(cpt)
+    while os.path.isdir(log_folder_full_path):
+        cpt += 1
+        log_folder_full_path = log_folder + "_" + str(cpt)
+    os.makedirs(log_folder_full_path)
+    filepath = log_folder_full_path + "/logs.log"
+    return filepath
+
+
+def configurate_logger(
+    log_path="logs/run", filters=None, filters_terminal=[filter_all_but_warnings_and_errors], filters_file=[filter_all]
+):
+    """
+    Configure structlog's logger and set general logging args (timestamps,
+    log level, etc.)
+
+    Args:
+        log_path: (str): logs folder's path.
+        filters: (list): list of function that filters logs that will be outputted in the terminal.
+    """
+    if filters_file != [filter_all] or filters is not None:
+        log_path = create_new_log_folder(log_path)
+    terminal_logger = TerminalLogger(filters=filters if filters is not None else filters_terminal)
+    file_logger = FileLogger(log_path=log_path, filters=filters if filters is not None else filters_file)
+    return terminal_logger, file_logger
+
+
+def log_exception(module, exception):
+    """function that enable modules to log the encountered exceptions to both logger (terminal and
+    file) in
+    a unified way (and factorize code).
+
+    Args:
+        module (object): the module that encountered the exception.
+        exception (Exception): the encountered exception.
+    """
+    module.terminal_logger.exception("The module encountered the following exception while running :")
+    module.file_logger.exception(
+        "The module encountered the following exception while running :",
+    )
+    # could introduce errors while parsing the json logs,
+    # because of the " chars in the exception tracebacks
+    # module.file_logger.exception(
+    #     "The module encountered the following exception while running :",
+    #     tarcebacks=[
+    #         tb.replace('"', "'") for tb in traceback.format_tb(exception.__traceback__)
+    #     ],
+    # )
 
 
 ###########
