@@ -576,7 +576,7 @@ def plot(
         last line processed. Used to only process new logs at each plot_live loop.
     """
     nb_pb_line = 0
-    terminal_logger = BoundLoggerTerminalWrapper()
+    terminal_logger = TerminalLogger()
 
     with open(log_file_path, encoding="utf-8") as f:
         lines = f.readlines()
