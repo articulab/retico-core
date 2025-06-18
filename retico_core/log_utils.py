@@ -15,6 +15,7 @@ execution, or in real time during an execution).
 """
 
 import datetime
+import logging
 import os
 import json
 from pathlib import Path
@@ -220,6 +221,29 @@ def filter_all(_, __, event_dict):
 #####################
 
 
+def add_custom_log_level(name: str, num: int):
+    """
+    Add a custom logging level (e.g., TRACE) to both logging and structlog.
+    """
+    name_lower = name.lower()
+
+    # Register with logging
+    logging.addLevelName(num, name.upper())
+
+    # Add method to logging.Logger
+    def log_for_level(self, message, *args, **kwargs):
+        if self.isEnabledFor(num):
+            self._log(num, message, args, **kwargs)
+
+    setattr(logging.Logger, name_lower, log_for_level)
+
+    # Add method to structlog.stdlib.BoundLogger
+    def structlog_for_level(self, event=None, **kw):
+        return self._proxy_to_logger(name_lower, event, **kw)
+
+    setattr(structlog.stdlib.BoundLogger, name_lower, structlog_for_level)
+
+
 class TerminalLogger(structlog.BoundLogger):
     """Dectorator / Singleton class of structlog.BoundLogger, that is used to configure / initialize
     once the terminal logger for the whole system."""
@@ -242,6 +266,8 @@ class TerminalLogger(structlog.BoundLogger):
                 if isinstance(obj, int):
                     return " | " + str(obj) + " | "
                 return " " + str(obj)
+
+            logging.basicConfig(level=0, format="%(message)s")
 
             cr = structlog.dev.ConsoleRenderer(
                 colors=True,
@@ -310,6 +336,7 @@ class TerminalLogger(structlog.BoundLogger):
             structlog.configure(
                 processors=processors,
                 wrapper_class=structlog.stdlib.BoundLogger,
+                logger_factory=structlog.stdlib.LoggerFactory(),
                 cache_logger_on_first_use=True,
             )
             terminal_logger = structlog.get_logger("terminal")
@@ -468,6 +495,8 @@ def configurate_logger(
         log_path = create_new_log_folder(log_path)
     terminal_logger = TerminalLogger(filters=filters if filters is not None else filters_terminal)
     file_logger = FileLogger(log_path=log_path, filters=filters if filters is not None else filters_file)
+    add_custom_log_level("abstract", 9)
+    add_custom_log_level("trace", 1)
     return terminal_logger, file_logger
 
 

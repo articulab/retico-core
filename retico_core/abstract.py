@@ -668,7 +668,7 @@ class AbstractModule:
                 args["last_grounded_in_created_at"] = last_iu.grounded_in.created_at
             if last_iu.previous_iu is not None:
                 args["last_previous_iu_created_at"] = last_iu.previous_iu.created_at
-            self.terminal_logger.info("append UM", **args)
+            self.terminal_logger.abstract("append UM", **args)
             self.file_logger.info("append UM", **args)
         else:
             self.file_logger.info("append UM")
@@ -803,7 +803,7 @@ class AbstractModule:
                                     self.found_invalid_ius.append(viu)
                                 continue
                             # logging process update
-                            self.terminal_logger.info("process_update")
+                            self.terminal_logger.abstract("process_update")
                             self.file_logger.info("process_update")
                             output_message = self.process_update(update_message)
                             update_message.set_processed(self)
@@ -852,7 +852,7 @@ class AbstractModule:
         immediately be run. For code that should be executed immediately before
         a module is run use the `prepare_run` method.
         """
-        self.terminal_logger.info("setup")
+        self.terminal_logger.abstract("setup")
         self.file_logger.info("setup")
 
     def prepare_run(self):
@@ -864,13 +864,13 @@ class AbstractModule:
         this method makes sure that other modules in the network are also
         already setup.
         """
-        self.terminal_logger.info("prepare_run")
+        self.terminal_logger.abstract("prepare_run")
         self.file_logger.info("prepare_run")
 
     def shutdown(self):
         """This method is called before the module is stopped. This method can
         be used to tear down the pipeline needed for processing the IUs."""
-        self.terminal_logger.info("shutdown")
+        self.terminal_logger.abstract("shutdown")
         self.file_logger.info("shutdown")
 
     def run(self, run_setup=True):
@@ -930,7 +930,7 @@ class AbstractModule:
         self._previous_iu = new_iu
 
         try:
-            self.terminal_logger.info(
+            self.terminal_logger.abstract(
                 "create_iu",
                 iuid=new_iu.iuid,
                 previous_iu=(new_iu.previous_iu.iuid if new_iu.previous_iu is not None else None),
