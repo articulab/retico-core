@@ -203,6 +203,30 @@ def filter_all_but_warnings_and_errors(_, __, event_dict):
     return filter_cases(_, _, event_dict, cases=cases)
 
 
+def filter_all_but_info_warnings_and_errors(_, __, event_dict):
+    """function that filters all log message that is not a warning or an error.
+
+    Args:
+        event_dict (dict): the log message's dict, containing all parameters passed during logging.
+
+    Returns:
+        dict : returns the log_message's event_dict if it went through the filter.
+    """
+    cases = [
+        [
+            (
+                "level",
+                [
+                    "info",
+                    "warning",
+                    "error",
+                ],
+            ),
+        ],
+    ]
+    return filter_cases(_, _, event_dict, cases=cases)
+
+
 def filter_all(_, __, event_dict):
     """function that filters all log message that has a `module` key.
     (every retico module binds this parameter, so it would delete every log from retico modules)
@@ -481,7 +505,10 @@ def create_new_log_folder(log_folder):
 
 
 def configurate_logger(
-    log_path="logs/run", filters=None, filters_terminal=[filter_all_but_warnings_and_errors], filters_file=[filter_all]
+    log_path="logs/run",
+    filters=None,
+    filters_terminal=[filter_all_but_info_warnings_and_errors],
+    filters_file=[filter_all],
 ):
     """
     Configure structlog's logger and set general logging args (timestamps,
