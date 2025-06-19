@@ -266,6 +266,7 @@ def add_custom_log_level(name: str, num: int):
         return self._proxy_to_logger(name_lower, event, **kw)
 
     setattr(structlog.stdlib.BoundLogger, name_lower, structlog_for_level)
+    setattr(structlog.PrintLogger, name_lower, structlog_for_level)
 
 
 class TerminalLogger(structlog.BoundLogger):
@@ -291,7 +292,10 @@ class TerminalLogger(structlog.BoundLogger):
                     return " | " + str(obj) + " | "
                 return " " + str(obj)
 
-            logging.basicConfig(level=0, format="%(message)s")
+            # level = logging.WARNING
+            level = 0
+            logging.basicConfig(level=level)
+            # logging.getLogger("terminal").setLevel(0)
 
             cr = structlog.dev.ConsoleRenderer(
                 colors=True,
@@ -360,7 +364,8 @@ class TerminalLogger(structlog.BoundLogger):
             structlog.configure(
                 processors=processors,
                 wrapper_class=structlog.stdlib.BoundLogger,
-                logger_factory=structlog.stdlib.LoggerFactory(),
+                # logger_factory=structlog.stdlib.LoggerFactory(),
+                logger_factory=structlog.PrintLoggerFactory(),
                 cache_logger_on_first_use=True,
             )
             terminal_logger = structlog.get_logger("terminal")
@@ -520,10 +525,11 @@ def configurate_logger(
     """
     if filters_file != [filter_all] or filters is not None:
         log_path = create_new_log_folder(log_path)
-    terminal_logger = TerminalLogger(filters=filters if filters is not None else filters_terminal)
-    file_logger = FileLogger(log_path=log_path, filters=filters if filters is not None else filters_file)
+
     add_custom_log_level("abstract", 9)
     add_custom_log_level("trace", 1)
+    terminal_logger = TerminalLogger(filters=filters if filters is not None else filters_terminal)
+    file_logger = FileLogger(log_path=log_path, filters=filters if filters is not None else filters_file)
     return terminal_logger, file_logger
 
 
