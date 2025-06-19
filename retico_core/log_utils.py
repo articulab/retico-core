@@ -342,7 +342,7 @@ class TerminalLogger(structlog.BoundLogger):
             terminal_logger = structlog.get_logger("terminal")
 
             # log info to cache the logger, using the config's cache_logger_on_first_use parameter
-            terminal_logger.info("init terminal logger")
+            terminal_logger.abstract("init terminal logger")
 
             # set the singleton instance
             cls.instance = terminal_logger
