@@ -302,8 +302,8 @@ class TerminalLogger(structlog.BoundLogger):
                 return " " + str(obj)
 
             # level = logging.WARNING
-            level = 0
-            logging.basicConfig(level=level)
+            # level = 0
+            # logging.basicConfig(level=level)
             # logging.getLogger("terminal").setLevel(0)
 
             cr = structlog.dev.ConsoleRenderer(
@@ -536,8 +536,8 @@ def configurate_logger(
     if filters_file != [filter_all] or filters is not None:
         log_path = create_new_log_folder(log_path)
 
-    add_custom_log_level("abstract", 9)
-    add_custom_log_level("trace", 1)
+    # add_custom_log_level("abstract", 9)
+    # add_custom_log_level("trace", 1)
     terminal_logger = TerminalLogger(filters=filters if filters is not None else filters_terminal)
     file_logger = FileLogger(log_path=log_path, filters=filters if filters is not None else filters_file)
     return terminal_logger, file_logger
