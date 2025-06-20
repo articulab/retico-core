@@ -244,6 +244,15 @@ def filter_all(_, __, event_dict):
 # Loggers & Functions
 #####################
 
+def custom_add_log_level(
+    logger, method_name, event_dict
+):
+    # event_dict["level"] = map_method_name(method_name)
+    custom_log_level = event_dict.get("cl", None)
+    level = custom_log_level if custom_log_level is not None else structlog._log_levels.map_method_name(method_name)
+    event_dict["level"] = level
+
+    return event_dict
 
 def add_custom_log_level(name: str, num: int):
     """
@@ -356,7 +365,8 @@ class TerminalLogger(structlog.BoundLogger):
             processors = (
                 [
                     structlog.processors.TimeStamper(fmt="%H:%M:%S.%f"),
-                    structlog.processors.add_log_level,
+                    # structlog.processors.add_log_level,
+                    custom_add_log_level,
                 ]
                 + filters
                 + [cr]
@@ -365,13 +375,13 @@ class TerminalLogger(structlog.BoundLogger):
                 processors=processors,
                 wrapper_class=structlog.stdlib.BoundLogger,
                 # logger_factory=structlog.stdlib.LoggerFactory(),
-                logger_factory=structlog.PrintLoggerFactory(),
+                # logger_factory=structlog.PrintLoggerFactory(),
                 cache_logger_on_first_use=True,
             )
             terminal_logger = structlog.get_logger("terminal")
 
             # log info to cache the logger, using the config's cache_logger_on_first_use parameter
-            terminal_logger.abstract("init terminal logger")
+            terminal_logger.debug("init terminal logger", cl="abstract")
 
             # set the singleton instance
             cls.instance = terminal_logger

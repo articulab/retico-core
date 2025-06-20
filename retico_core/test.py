@@ -27,6 +27,15 @@ class CustomBoundLogger(structlog.stdlib.BoundLogger):
     def trace(self, event=None, **kw):
         return self._proxy_to_logger("trace", event, **kw)
 
+def custom_add_log_level(
+    logger, method_name, event_dict
+):
+    # event_dict["level"] = map_method_name(method_name)
+    custom_log_level = event_dict.get("cl", None)
+    level = custom_log_level if custom_log_level is not None else structlog._log_levels.map_method_name(method_name)
+    event_dict["level"] = level
+
+    return event_dict
 
 # Step 3: Configure structlog to use stdlib + custom level
 structlog.configure(
@@ -34,8 +43,9 @@ structlog.configure(
     # logger_factory=structlog.stdlib.LoggerFactory(),
     processors=[
         # structlog.stdlib.filter_by_level,
-        structlog.stdlib.add_logger_name,
-        structlog.stdlib.add_log_level,
+        # structlog.stdlib.add_logger_name,
+        # structlog.stdlib.add_log_level,
+        custom_add_log_level,
         structlog.processors.TimeStamper(fmt="iso"),
         structlog.processors.JSONRenderer(),
     ],
@@ -46,6 +56,7 @@ structlog.configure(
 # logging.basicConfig(level=TRACE_LEVEL_NUM, format="%(message)s")
 
 # Step 5: Use the logger
-log = structlog.get_logger()
-log.trace("This is a trace log")
+log = structlog.get_logger("test")
 log.debug("This is a debug log")
+log.info("This is a trace log", cl="trace")
+log.trace("This is a trace log")
