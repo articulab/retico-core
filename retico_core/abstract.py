@@ -804,7 +804,7 @@ class AbstractModule:
                                 continue
                             # logging process update
                             self.terminal_logger.debug("process_update", cl="abstract")
-                            self.file_logger.info("process_update")
+                            self.file_logger.info("process_update", iuids=[iu.iuid for iu, _ in update_message._msgs])
                             output_message = self.process_update(update_message)
                             update_message.set_processed(self)
                             for input_iu in update_message.incremental_units():
