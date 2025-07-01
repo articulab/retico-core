@@ -26,10 +26,10 @@ class CustomInstall(install):
         print(f"System OS : {sys.platform}")
         if sys.platform.startswith("linux"):
             print("Detected Linux: Installing pyaudio via Conda...")
-            subprocess.run(["conda", "install", "-c", "conda-forge", "-y", "pyaudio"], check=True)
+            subprocess.run(["conda", "install", "-c", "conda-forge", "-y", "pyaudio>=0.2.14"], check=True)
         else:
             print("Detected non-Linux: Installing pyaudio via pip...")
-            subprocess.run([sys.executable, "-m", "pip", "install", "pyaudio"], check=True)
+            subprocess.run([sys.executable, "-m", "pip", "install", "pyaudio>=0.2.14"], check=True)
 
 
 config = {
